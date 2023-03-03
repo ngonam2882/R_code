@@ -1,0 +1,170 @@
+## 1. Introduction
+
+**Overview of the Dataset** 
+
+The dataset is about the advertising spendings between Social Media Budgets and Sales (in Thousands \$ ), which is a Kaggle dataset ( https://www.kaggle.com/code/vaishnavi28krishna/marketing-linear-regression/data?select=Marketing_Data.csv). The dataset conatains 171 observations (rows) and four predictors (columns) including youtube, facebook newspaper, and sales.
+
+
+**Data field information**
+
+-   **youtube**: advertising dollars spent on youtube for a single product in a given market (in thousands of dollars).
+
+-   **facebook**: advertising dollars spent on facebook
+
+-   **newspaper**: advertising dollars spent on newspaper.
+
+-   **sales**: sales of a single product in a given market (in thousands of items)
+
+
+## 2. Reading and examine the data
+
+```{r}
+# read CSV file from the 'data' subdirectory using a relative path
+SALES = read.csv("E:/R Studio/Assignment/FInal/Regression/mar_data.csv", h=T)
+
+# display the first 5 rows
+head(SALES)
+
+# check the shape of the DataFrame (rows, columns)
+dim(SALES)
+
+# show column names
+names(SALES)
+```
+
+## 3. Visualize the relationship between the predictors and the response using scatter plots
+
+```{r}
+# make objects in data frames accessible without actually typing the name of the data frame.
+attach(SALES)
+```
+
+```{r}
+# Plot linear-fit lines of each variable with the sales response
+reg_1 = lm(sales~youtube)
+reg_2 = lm(sales~facebook)
+reg_3 = lm(sales~newspaper)
+
+par(mfrow=c(1, 3))
+
+plot(youtube, sales, col='blue')
+abline(reg_1$coef[1], reg_1$coef[2], col='red')
+
+plot(facebook, sales, col='blue')
+abline(reg_2$coef[1], reg_2$coef[2], col='red')
+
+plot(newspaper, sales, col='blue')
+abline(reg_3$coef[1], reg_3$coef[2], col='red')
+
+# Compute pairwise correlation of variables 
+cor(SALES)
+```
+
+Remark: There appears to be a linear relationship between the predictors and response. This is a great candidate for the linear regression method. 
+The degree of correlation between the sales variable and the two variables youtube and facebook is quite high (correlation = 0.78203 and 0.254987 respectively), while the correlation between sales and newspaper variables is quite weak (correlation=0.254987).
+
+## 4. Model baseline
+
+We first build a multiple linear regression model as a baseline model because it is fast, no tuning required, highly interpretable.
+
+### a) Form of Multiple Linear Regression
+
+$y = \beta_0 + \beta_1x_1 + \beta_2x_2 + ... + \beta_nx_n$
+
+-   $y$ is the response
+-   $\beta_0$ is the intercept
+-   $\beta_1$ is the coefficient for $x_1$ (the first predictor)
+-   $\beta_n$ is the coefficient for $x_n$ (the nth predictor)
+
+In this case:
+
+$y = \beta_0 + \beta_1 \times youtube + \beta_2 \times facebook + \beta_3 \times newspaper$
+
+The $\beta$ values are called the model coefficients. These values are "learned" during the model fitting step using the "least squares" criterion. Then, the fitted model can be used to make predictions!
+
+### b) Model Fitting
+
+```{r}
+reg = lm(sales~youtube+facebook+newspaper)
+summary(reg)
+```
+
+### c) Interpreting results from summary of the model
+
+**Coefficients**
+
+$$y = 3.5058 + 0.0452 \times youtube + 0.1883 \times facebook + 0.00427 \times newspaper$$
+
+
+For a given amount of facebook and newspaper ad spending, "unit" increase in youtube ad spending is associated with a 0.0452 "unit" increase in sales. Or more clearly: For a given amount of facebook and newspaper ad spending, an additional $1,000 spent on TV ads is associated with an increase in sales of 45.2 items. The same model coefficient interpretation for facebook and newspaper!
+
+
+**Multiple R-squared vs Adjusted R-squared**
+
+Multiple r-squared of 90% reveals that 90% of the variability observed in the target variable "sales" is explained by the regression model. For adjusted R-squared of 0.8987, we can utilize this one to indicate how well terms fit a curve or line, but adjusts for the number of terms in a model. If you add more and more useless variables to a model, adjusted r-squared will decrease. If you add more useful variables, adjusted r-squared will increase.
+
+**P-value**
+
+P-value of 2.2e-16 (significantly smaller than 0.05) indicates a significant result
+
+## 5. Model Evaluation
+
+We use train-test-split technique (hold-out method) for model evaluation when:
+
+- Linear Regression model can be trained and tested on different data.
+- Response values are known for the testing set, and thus predictions can be evaluated.
+- Testing error is a better estimate than training error of out-of-sample performance.
+
+The metric to measure how performing our model is **Mean Squared Error** (MSE) that is the mean of the squared errors. The reason for this choice is that MSE is more popular than MAE and it "punishes" larger errors:
+
+$$MSE = \frac 1n\sum_{i=1}^n(y_i-\hat{y}_i)^2$$
+We split the dataset with the ratio of 70% for training and 30% for testing. Specifically, the datasets contains 171 observations. Thus, The data from the first row to row 120 will be the data for the model fit and the test data will be from position 121 in the dataset to the last row of the dataset (171th row).
+
+```{r}
+# Model fitting
+reg = lm(sales[1:120]~youtube[1:120]+facebook[1:120]+newspaper[1:120])
+
+# Get coefficients of each variable
+beta_0 = reg$coef[1]
+beta_1 = reg$coef[2]
+beta_2 = reg$coef[3]
+beta_3 = reg$coef[4]
+
+# Make predictions on test data 
+y_pred = beta_0 + youtube[121:171]*beta_1 + facebook[121:171]*beta_2 + newspaper[121:171]*beta_3
+y_true = sales[121:171]
+
+# compute the mean squared error
+mse = sum((y_pred - y_true)^2) / length(sales[121:171]);mse
+```
+
+The mean squared error is **3.821636**
+
+## 6. Feature Selection
+
+When we visualize the data, we observed that the "newspaper" variable appears to have a weak correlation with sales (correlation = 0.254987). As a result, we would comes up with a feature selection idea that we will remove the newspaper feature from the model baseline and see how that affects the MSE.
+
+```{r}
+# model fitting
+reg = lm(sales[1:120]~youtube[1:120]+facebook[1:120])
+summary(reg)
+
+# Get coefficients of each variable
+beta_0 = reg$coef[1]
+beta_1 = reg$coef[2]
+beta_2 = reg$coef[3]
+
+# Make predictions on test data 
+y_pred = beta_0 + youtube[121:171]*beta_1 + facebook[121:171]*beta_2 
+y_true = sales[121:171]
+
+# compute the mean squared error
+mse = sum((y_pred - y_true)^2) / length(sales[121:171]);mse
+```
+
+
+
+The mean squared error after removing the feature "newspaper" is almost the same to the performance of the baseline model (3.827158 ~ 3.821636). We can remove the feature newspaper without losing too much information, while the MSE remains the same. As the data grows at scale, This removal can partly save time and computational resources for training the model and making future sales predictions.
+
+We use this final model to forecast sales:
+$$y = 3.73542 + 0.04687 \times youtube + 0.17913 \times facebook$$
